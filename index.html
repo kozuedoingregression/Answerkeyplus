@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnswerKey+</title>
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121212">
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: white;
+        color: black;
+        transition: background-color 0.3s, color 0.3s;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .dark-mode {
+        background-color: #121212;
+        color: white;
+    }
+    .section {
+        margin-bottom: 20px;
+    }
+    .button-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 10px;
+    }
+    button {
+        padding: 8px 14px;
+        font-size: 15px;
+        cursor: pointer;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        background: #f2f2f2;
+    }
+    button:disabled {
+        background: #ddd;
+        cursor: not-allowed;
+    }
+    #answer-list, #key-list {
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    #result {
+        font-size: 16px;
+        margin-top: 20px;
+        line-height: 1.6;
+    }
+    #theme-toggle {
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        padding: 8px 12px;
+        font-size: 14px;
+        border: none;
+        background-color: #444;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 999;
+    }
+    input[type="time"], input[type="number"] {
+        font-size: 16px;
+        padding: 4px;
+        max-width: 120px;
+    }
+    footer {
+        padding: 8px;
+        text-align: center;
+        font-size: 14px;
+        border-top: 1px solid #ccc;
+        margin-top: 40px;
+    }
+    .dark-mode footer {
+        color: white;
+        border-color: #555;
+    }
+
+    /* Responsive layout */
+    @media (max-width: 600px) {
+        body {
+            margin: 10px;
+        }
+        button {
+            flex: 1 1 calc(33.3% - 10px);
+            min-width: 80px;
+        }
+        .section h3 {
+            font-size: 18px;
+        }
+        #theme-toggle {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" onclick="toggleTheme()">☀️</button>
+
+<h2>AnswerKey+</h2>
+
+<div class="section">
+    <label>Test Name:
+        <input type="text" id="test-name" placeholder="Enter test name">
+    </label>
+</div>
+
+<div class="section">
+    <label>Test Duration:
+        <input type="time" id="time-input" step="1" value="02:00:00">
+    </label>
+    <button id="start-stop-btn" onclick="toggleTimer()">Start</button>
+    <span id="time-display"></span>
+</div>
+
+<div class="section">
+    <h3>Your Answers</h3>
+    <div class="button-container" id="user-buttons">
+        <button onclick="addAnswer(userAnswers, 'A', 'answer-list')">A</button>
+        <button onclick="addAnswer(userAnswers, 'B', 'answer-list')">B</button>
+        <button onclick="addAnswer(userAnswers, 'C', 'answer-list')">C</button>
+        <button onclick="addAnswer(userAnswers, 'D', 'answer-list')">D</button>
+        <button onclick="addAnswer(userAnswers, 'NA', 'answer-list')">Skip</button>
+        <button onclick="undoAnswer(userAnswers, 'answer-list')">Undo</button>
+    </div>
+    <div id="answer-list"></div>
+</div>
+
+<div class="section">
+    <h3>Correct Answer Key</h3>
+    <div class="button-container" id="key-buttons">
+        <button onclick="addAnswer(correctKey, 'A', 'key-list')">A</button>
+        <button onclick="addAnswer(correctKey, 'B', 'key-list')">B</button>
+        <button onclick="addAnswer(correctKey, 'C', 'key-list')">C</button>
+        <button onclick="addAnswer(correctKey, 'D', 'key-list')">D</button>
+        <button onclick="addAnswer(correctKey, 'NA', 'key-list')">Skip</button>
+        <button onclick="undoAnswer(correctKey, 'key-list')">Undo</button>
+    </div>
+    <div id="key-list"></div>
+</div>
+
+<div class="section">
+    <label>Marks for Correct Answer: <input type="number" id="correct-mark" value="3"></label><br>
+    <label>Penalty for Wrong Answer: <input type="number" id="wrong-mark" value="-1"></label>
+</div>
+
+<button id="result-btn" onclick="checkAnswers()" style="display:none;">Show Result</button>
+<div id="result"></div>
+
+<footer>
+    AnswerKey+ © 2025 | Developed by 
+    <a href="https://twitter.com/0xaa248" target="_blank" style="color:inherit; text-decoration: underline;">
+        Kozue
+    </a>
+</footer>
+
+
+<script>
+    let userAnswers = [];
+    let correctKey = [];
+    let timerInterval;
+    let timeRemaining = 0;
+    let timerRunning = false;
+    let totalTestTime = 0;
+
+    function addAnswer(list, choice, displayId) {
+        if (list === userAnswers && !timerRunning) {
+            alert("User answer entry is closed. Timer is stopped.");
+            return;
+        }
+        list.push(choice);
+        updateList(list, displayId);
+    }
+
+    function undoAnswer(list, displayId) {
+        if (list === userAnswers && !timerRunning) return;
+        list.pop();
+        updateList(list, displayId);
+    }
+
+    function updateList(list, displayId) {
+        const container = document.getElementById(displayId);
+        container.innerHTML = '';
+        list.forEach((ans, index) => {
+            const div = document.createElement('div');
+            div.textContent = `${index + 1}. ${ans}`;
+            container.appendChild(div);
+        });
+    }
+
+    function toggleTimer() {
+        const btn = document.getElementById('start-stop-btn');
+        if (!timerRunning) {
+            let [hh, mm, ss] = document.getElementById('time-input').value.split(":").map(Number);
+            timeRemaining = hh * 3600 + mm * 60 + ss;
+            totalTestTime = timeRemaining;
+            if (timeRemaining <= 0) {
+                alert("Please set a valid time.");
+                return;
+            }
+            timerRunning = true;
+            btn.textContent = "Stop";
+            document.getElementById('time-input').disabled = true;
+            timerInterval = setInterval(updateTimer, 1000);
+        } else {
+            timerRunning = false;
+            clearInterval(timerInterval);
+            btn.textContent = "Start";
+            disableUserButtons();
+            document.getElementById('result-btn').style.display = 'inline-block';
+        }
+    }
+
+    function updateTimer() {
+        if (timeRemaining > 0) {
+            timeRemaining--;
+            let hh = String(Math.floor(timeRemaining / 3600)).padStart(2, '0');
+            let mm = String(Math.floor((timeRemaining % 3600) / 60)).padStart(2, '0');
+            let ss = String(timeRemaining % 60).padStart(2, '0');
+            document.getElementById('time-display').textContent = `Time Left: ${hh}:${mm}:${ss}`;
+        } else {
+            toggleTimer();
+        }
+    }
+
+    function disableUserButtons() {
+        document.querySelectorAll("#user-buttons button").forEach(btn => {
+            btn.disabled = true;
+        });
+    }
+
+    function checkAnswers() {
+    const testName = document.getElementById('test-name').value.trim() || "Untitled Test";
+    const correctMark = parseFloat(document.getElementById('correct-mark').value) || 3;
+    const wrongMark = parseFloat(document.getElementById('wrong-mark').value) || -1;
+
+    if (userAnswers.length !== correctKey.length) {
+        alert("Number of answers does not match the number of correct answers.");
+        return;
+    }
+
+    let correct = 0, wrong = 0, notAttempted = 0;
+
+    for (let i = 0; i < userAnswers.length; i++) {
+        if (userAnswers[i] === 'NA') {
+            notAttempted++;
+        } else if (userAnswers[i] === correctKey[i]) {
+            correct++;
+        } else {
+            wrong++;
+        }
+    }
+
+    const totalQuestions = userAnswers.length;
+    const totalPossible = totalQuestions * correctMark;
+    const positiveMarks = correct * correctMark;
+    const negativeMarks = wrong * wrongMark;
+    const totalMarksObtained = positiveMarks + negativeMarks;
+
+    let timeLeftH = String(Math.floor(timeRemaining / 3600)).padStart(2, '0');
+    let timeLeftM = String(Math.floor((timeRemaining % 3600) / 60)).padStart(2, '0');
+    let timeLeftS = String(timeRemaining % 60).padStart(2, '0');
+
+    let timeTakenSec = totalTestTime - timeRemaining;
+    let timeTakenH = String(Math.floor(timeTakenSec / 3600)).padStart(2, '0');
+    let timeTakenM = String(Math.floor((timeTakenSec % 3600) / 60)).padStart(2, '0');
+    let timeTakenS = String(timeTakenSec % 60).padStart(2, '0');
+
+    let totalTimeH = String(Math.floor(totalTestTime / 3600)).padStart(2, '0');
+    let totalTimeM = String(Math.floor((totalTestTime % 3600) / 60)).padStart(2, '0');
+    let totalTimeS = String(totalTestTime % 60).padStart(2, '0');
+
+    document.getElementById('result').innerHTML = `
+        <strong> ${testName} </strong> <br><br>
+        <strong>Result Summary:</strong><br>
+        Total Test Time: ${totalTimeH}:${totalTimeM}:${totalTimeS}<br>
+        Time Taken: ${timeTakenH}:${timeTakenM}:${timeTakenS}<br>
+        Time Left: ${timeLeftH}:${timeLeftM}:${timeLeftS}<br><br>
+        Total Questions: ${totalQuestions}<br>
+        Marks for Correct Answer: ${correctMark}<br>
+        Penalty for Wrong Answer: ${wrongMark}<br><br>
+        Correct Answers: ${correct}<br>
+        Wrong Answers: ${wrong}<br>
+        Not Attempted: ${notAttempted}<br><br>
+        Total Possible Marks: ${totalPossible}<br>
+        Positive Marks (Correct × ${correctMark}): ${positiveMarks}<br>
+        Negative Marks (Wrong × ${wrongMark}): ${negativeMarks}<br><br>
+        <strong>Total Marks Obtained: ${totalMarksObtained}</strong>
+    `;
+}
+
+
+    function toggleTheme() {
+        document.body.classList.toggle("dark-mode");
+        const btn = document.getElementById("theme-toggle");
+        btn.textContent = document.body.classList.contains("dark-mode") ? "🌕" : "☀️";
+    }
+
+    // PWA install
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js');
+    }
+</script>
+</body>
+</html>

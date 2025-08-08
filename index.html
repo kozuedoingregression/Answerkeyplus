@@ -67,10 +67,10 @@
         cursor: pointer;
         z-index: 999;
     }
-    input[type="time"], input[type="number"] {
+    input[type="time"], input[type="number"], input[type="text"] {
         font-size: 16px;
         padding: 4px;
-        max-width: 120px;
+        max-width: 200px;
     }
     footer {
         padding: 8px;
@@ -84,7 +84,6 @@
         border-color: #555;
     }
 
-    /* Responsive layout */
     @media (max-width: 600px) {
         body {
             margin: 10px;
@@ -164,7 +163,6 @@
     </a>
 </footer>
 
-
 <script>
     let userAnswers = [];
     let correctKey = [];
@@ -174,16 +172,11 @@
     let totalTestTime = 0;
 
     function addAnswer(list, choice, displayId) {
-        if (list === userAnswers && !timerRunning) {
-            alert("User answer entry is closed. Timer is stopped.");
-            return;
-        }
         list.push(choice);
         updateList(list, displayId);
     }
 
     function undoAnswer(list, displayId) {
-        if (list === userAnswers && !timerRunning) return;
         list.pop();
         updateList(list, displayId);
     }
@@ -216,7 +209,7 @@
             timerRunning = false;
             clearInterval(timerInterval);
             btn.textContent = "Start";
-            disableUserButtons();
+            // Now answers remain editable after pausing
             document.getElementById('result-btn').style.display = 'inline-block';
         }
     }
@@ -233,72 +226,69 @@
         }
     }
 
-    function disableUserButtons() {
-        document.querySelectorAll("#user-buttons button").forEach(btn => {
-            btn.disabled = true;
-        });
-    }
-
     function checkAnswers() {
-    const testName = document.getElementById('test-name').value.trim() || "Untitled Test";
-    const correctMark = parseFloat(document.getElementById('correct-mark').value) || 3;
-    const wrongMark = parseFloat(document.getElementById('wrong-mark').value) || -1;
+        const testName = document.getElementById('test-name').value.trim() || "Untitled Test";
+        const correctMark = parseFloat(document.getElementById('correct-mark').value) || 3;
+        const wrongMark = parseFloat(document.getElementById('wrong-mark').value) || -1;
 
-    if (userAnswers.length !== correctKey.length) {
-        alert("Number of answers does not match the number of correct answers.");
-        return;
-    }
-
-    let correct = 0, wrong = 0, notAttempted = 0;
-
-    for (let i = 0; i < userAnswers.length; i++) {
-        if (userAnswers[i] === 'NA') {
-            notAttempted++;
-        } else if (userAnswers[i] === correctKey[i]) {
-            correct++;
-        } else {
-            wrong++;
+        if (userAnswers.length !== correctKey.length) {
+            alert("Number of answers does not match the number of correct answers.");
+            return;
         }
+
+        let correct = 0, wrong = 0, notAttempted = 0;
+        let wrongAnswersList = [];
+
+        for (let i = 0; i < userAnswers.length; i++) {
+            if (userAnswers[i] === 'NA') {
+                notAttempted++;
+            } else if (userAnswers[i] === correctKey[i]) {
+                correct++;
+            } else {
+                wrong++;
+                wrongAnswersList.push(`${i + 1}. ${userAnswers[i]} → ${correctKey[i]}`);
+            }
+        }
+
+        const totalQuestions = userAnswers.length;
+        const totalPossible = totalQuestions * correctMark;
+        const positiveMarks = correct * correctMark;
+        const negativeMarks = wrong * wrongMark;
+        const totalMarksObtained = positiveMarks + negativeMarks;
+
+        let timeLeftH = String(Math.floor(timeRemaining / 3600)).padStart(2, '0');
+        let timeLeftM = String(Math.floor((timeRemaining % 3600) / 60)).padStart(2, '0');
+        let timeLeftS = String(timeRemaining % 60).padStart(2, '0');
+
+        let timeTakenSec = totalTestTime - timeRemaining;
+        let timeTakenH = String(Math.floor(timeTakenSec / 3600)).padStart(2, '0');
+        let timeTakenM = String(Math.floor((timeTakenSec % 3600) / 60)).padStart(2, '0');
+        let timeTakenS = String(timeTakenSec % 60).padStart(2, '0');
+
+        let totalTimeH = String(Math.floor(totalTestTime / 3600)).padStart(2, '0');
+        let totalTimeM = String(Math.floor((totalTestTime % 3600) / 60)).padStart(2, '0');
+        let totalTimeS = String(totalTestTime % 60).padStart(2, '0');
+
+        document.getElementById('result').innerHTML = `
+            <strong>Test Name:</strong> ${testName}<br><br>
+            <strong>Result Summary:</strong><br>
+            Total Test Time: ${totalTimeH}:${totalTimeM}:${totalTimeS}<br>
+            Time Taken: ${timeTakenH}:${timeTakenM}:${timeTakenS}<br>
+            Time Left: ${timeLeftH}:${timeLeftM}:${timeLeftS}<br><br>
+            Total Questions: ${totalQuestions}<br>
+            Marks for Correct Answer: ${correctMark}<br>
+            Penalty for Wrong Answer: ${wrongMark}<br><br>
+            Correct Answers: ${correct}<br>
+            Wrong Answers: ${wrong}<br>
+            Not Attempted: ${notAttempted}<br><br>
+            Total Possible Marks: ${totalPossible}<br>
+            Positive Marks (Correct × ${correctMark}): ${positiveMarks}<br>
+            Negative Marks (Wrong × ${wrongMark}): ${negativeMarks}<br><br>
+            <strong>Total Marks Obtained: ${totalMarksObtained}</strong><br><br>
+            <strong>Wrong Answers List:</strong><br>
+            ${wrongAnswersList.length > 0 ? wrongAnswersList.join("<br>") : "None 🎉"}
+        `;
     }
-
-    const totalQuestions = userAnswers.length;
-    const totalPossible = totalQuestions * correctMark;
-    const positiveMarks = correct * correctMark;
-    const negativeMarks = wrong * wrongMark;
-    const totalMarksObtained = positiveMarks + negativeMarks;
-
-    let timeLeftH = String(Math.floor(timeRemaining / 3600)).padStart(2, '0');
-    let timeLeftM = String(Math.floor((timeRemaining % 3600) / 60)).padStart(2, '0');
-    let timeLeftS = String(timeRemaining % 60).padStart(2, '0');
-
-    let timeTakenSec = totalTestTime - timeRemaining;
-    let timeTakenH = String(Math.floor(timeTakenSec / 3600)).padStart(2, '0');
-    let timeTakenM = String(Math.floor((timeTakenSec % 3600) / 60)).padStart(2, '0');
-    let timeTakenS = String(timeTakenSec % 60).padStart(2, '0');
-
-    let totalTimeH = String(Math.floor(totalTestTime / 3600)).padStart(2, '0');
-    let totalTimeM = String(Math.floor((totalTestTime % 3600) / 60)).padStart(2, '0');
-    let totalTimeS = String(totalTestTime % 60).padStart(2, '0');
-
-    document.getElementById('result').innerHTML = `
-        <strong> ${testName} </strong> <br><br>
-        <strong>Result Summary:</strong><br>
-        Total Test Time: ${totalTimeH}:${totalTimeM}:${totalTimeS}<br>
-        Time Taken: ${timeTakenH}:${timeTakenM}:${timeTakenS}<br>
-        Time Left: ${timeLeftH}:${timeLeftM}:${timeLeftS}<br><br>
-        Total Questions: ${totalQuestions}<br>
-        Marks for Correct Answer: ${correctMark}<br>
-        Penalty for Wrong Answer: ${wrongMark}<br><br>
-        Correct Answers: ${correct}<br>
-        Wrong Answers: ${wrong}<br>
-        Not Attempted: ${notAttempted}<br><br>
-        Total Possible Marks: ${totalPossible}<br>
-        Positive Marks (Correct × ${correctMark}): ${positiveMarks}<br>
-        Negative Marks (Wrong × ${wrongMark}): ${negativeMarks}<br><br>
-        <strong>Total Marks Obtained: ${totalMarksObtained}</strong>
-    `;
-}
-
 
     function toggleTheme() {
         document.body.classList.toggle("dark-mode");
@@ -306,7 +296,6 @@
         btn.textContent = document.body.classList.contains("dark-mode") ? "🌕" : "☀️";
     }
 
-    // PWA install
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js');
     }
